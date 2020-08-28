@@ -6108,8 +6108,10 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 	int instance_index = 0;
 	ShaderNode::Uniform::Scope uniform_scope = ShaderNode::Uniform::SCOPE_LOCAL;
 
+	stages = &p_functions;
 	Set<String> includes;
 	int include_depth = 0;
+
 	while (tk.type != TK_EOF) {
 		switch (tk.type) {
 			case TK_IMPORT: {
