@@ -212,6 +212,10 @@ void Light3D::_validate_property(PropertyInfo &property) const {
 		property.usage = 0;
 	}
 
+	if (get_light_type() == RS::LIGHT_DIRECTIONAL && property.name == "light_specular") {
+		property.usage = 0;
+	}
+
 	if (get_light_type() == RS::LIGHT_DIRECTIONAL && property.name == "light_projector") {
 		property.usage = 0;
 	}
@@ -347,7 +351,7 @@ Light3D::Light3D(RenderingServer::LightType p_type) {
 	set_param(PARAM_SHADOW_BIAS, 0.02);
 	set_param(PARAM_SHADOW_NORMAL_BIAS, 1.0);
 	set_param(PARAM_TRANSMITTANCE_BIAS, 0.05);
-	set_param(PARAM_SHADOW_VOLUMETRIC_FOG_FADE, 1.0);
+	set_param(PARAM_SHADOW_VOLUMETRIC_FOG_FADE, 0.1);
 	set_param(PARAM_SHADOW_FADE_START, 1);
 	set_disable_scale(true);
 }

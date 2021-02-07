@@ -1920,32 +1920,22 @@ String Node::get_editor_description() const {
 void Node::set_editable_instance(Node *p_node, bool p_editable) {
 	ERR_FAIL_NULL(p_node);
 	ERR_FAIL_COND(!is_a_parent_of(p_node));
-	NodePath p = get_path_to(p_node);
 	if (!p_editable) {
-		data.editable_instances.erase(p);
+		p_node->data.editable_instance = false;
 		// Avoid this flag being needlessly saved;
 		// also give more visual feedback if editable children is re-enabled
 		set_display_folded(false);
 	} else {
-		data.editable_instances[p] = true;
+		p_node->data.editable_instance = true;
 	}
 }
 
 bool Node::is_editable_instance(const Node *p_node) const {
 	if (!p_node) {
-		return false; //easier, null is never editable :)
+		return false; // Easier, null is never editable. :)
 	}
 	ERR_FAIL_COND_V(!is_a_parent_of(p_node), false);
-	NodePath p = get_path_to(p_node);
-	return data.editable_instances.has(p);
-}
-
-void Node::set_editable_instances(const HashMap<NodePath, int> &p_editable_instances) {
-	data.editable_instances = p_editable_instances;
-}
-
-HashMap<NodePath, int> Node::get_editable_instances() const {
-	return data.editable_instances;
+	return p_node->data.editable_instance;
 }
 
 void Node::set_scene_instance_state(const Ref<SceneState> &p_state) {
@@ -2342,12 +2332,7 @@ static void find_owned_by(Node *p_by, Node *p_node, List<Node *> *p_owned) {
 	}
 }
 
-struct _NodeReplaceByPair {
-	String name;
-	Variant value;
-};
-
-void Node::replace_by(Node *p_node, bool p_keep_data) {
+void Node::replace_by(Node *p_node, bool p_keep_groups) {
 	ERR_FAIL_NULL(p_node);
 	ERR_FAIL_COND(p_node->data.parent);
 
@@ -2355,21 +2340,7 @@ void Node::replace_by(Node *p_node, bool p_keep_data) {
 	List<Node *> owned_by_owner;
 	Node *owner = (data.owner == this) ? p_node : data.owner;
 
-	List<_NodeReplaceByPair> replace_data;
-
-	if (p_keep_data) {
-		List<PropertyInfo> plist;
-		get_property_list(&plist);
-
-		for (List<PropertyInfo>::Element *E = plist.front(); E; E = E->next()) {
-			_NodeReplaceByPair rd;
-			if (!(E->get().usage & PROPERTY_USAGE_STORAGE)) {
-				continue;
-			}
-			rd.name = E->get().name;
-			rd.value = get(rd.name);
-		}
-
+	if (p_keep_groups) {
 		List<GroupInfo> groups;
 		get_groups(&groups);
 
@@ -2414,10 +2385,6 @@ void Node::replace_by(Node *p_node, bool p_keep_data) {
 	}
 
 	p_node->set_filename(get_filename());
-
-	for (List<_NodeReplaceByPair>::Element *E = replace_data.front(); E; E = E->next()) {
-		p_node->set(E->get().name, E->get().value);
-	}
 }
 
 void Node::_replace_connections_target(Node *p_new_target) {
@@ -2784,7 +2751,7 @@ void Node::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_tree"), &Node::get_tree);
 
 	ClassDB::bind_method(D_METHOD("duplicate", "flags"), &Node::duplicate, DEFVAL(DUPLICATE_USE_INSTANCING | DUPLICATE_SIGNALS | DUPLICATE_GROUPS | DUPLICATE_SCRIPTS));
-	ClassDB::bind_method(D_METHOD("replace_by", "node", "keep_data"), &Node::replace_by, DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("replace_by", "node", "keep_groups"), &Node::replace_by, DEFVAL(false));
 
 	ClassDB::bind_method(D_METHOD("set_scene_instance_load_placeholder", "load_placeholder"), &Node::set_scene_instance_load_placeholder);
 	ClassDB::bind_method(D_METHOD("get_scene_instance_load_placeholder"), &Node::get_scene_instance_load_placeholder);

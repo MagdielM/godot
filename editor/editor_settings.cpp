@@ -326,7 +326,26 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 
 	// Editor
 	_initial_set("interface/editor/display_scale", 0);
-	hints["interface/editor/display_scale"] = PropertyInfo(Variant::INT, "interface/editor/display_scale", PROPERTY_HINT_ENUM, "Auto,75%,100%,125%,150%,175%,200%,Custom", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_RESTART_IF_CHANGED);
+	// Display what the Auto display scale setting effectively corresponds to.
+	// The code below is adapted in `editor/editor_node.cpp` and `editor/project_manager.cpp`.
+	// Make sure to update those when modifying the code below.
+#ifdef OSX_ENABLED
+	float scale = DisplayServer::get_singleton()->screen_get_max_scale();
+#else
+	const int screen = DisplayServer::get_singleton()->window_get_current_screen();
+	float scale;
+	if (DisplayServer::get_singleton()->screen_get_dpi(screen) >= 192 && DisplayServer::get_singleton()->screen_get_size(screen).y >= 1400) {
+		// hiDPI display.
+		scale = 2.0;
+	} else if (DisplayServer::get_singleton()->screen_get_size(screen).y <= 800) {
+		// Small loDPI display. Use a smaller display scale so that editor elements fit more easily.
+		// Icons won't look great, but this is better than having editor elements overflow from its window.
+		scale = 0.75;
+	} else {
+		scale = 1.0;
+	}
+#endif
+	hints["interface/editor/display_scale"] = PropertyInfo(Variant::INT, "interface/editor/display_scale", PROPERTY_HINT_ENUM, vformat("Auto (%d%%),75%%,100%%,125%%,150%%,175%%,200%%,Custom", Math::round(scale * 100)), PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_RESTART_IF_CHANGED);
 	_initial_set("interface/editor/custom_display_scale", 1.0f);
 	hints["interface/editor/custom_display_scale"] = PropertyInfo(Variant::FLOAT, "interface/editor/custom_display_scale", PROPERTY_HINT_RANGE, "0.5,3,0.01", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_RESTART_IF_CHANGED);
 	_initial_set("interface/editor/main_font_size", 14);
@@ -334,12 +353,16 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 	_initial_set("interface/editor/code_font_size", 14);
 	hints["interface/editor/code_font_size"] = PropertyInfo(Variant::INT, "interface/editor/code_font_size", PROPERTY_HINT_RANGE, "8,48,1", PROPERTY_USAGE_DEFAULT);
 	_initial_set("interface/editor/code_font_contextual_ligatures", 0);
-	hints["interface/editor/code_font_contextual_ligatures"] = PropertyInfo(Variant::INT, "interface/editor/code_font_contextual_ligatures", PROPERTY_HINT_ENUM, "Default,Disable contextual alternates (coding ligatures),Use custom OpenType feature set", PROPERTY_USAGE_DEFAULT);
+	hints["interface/editor/code_font_contextual_ligatures"] = PropertyInfo(Variant::INT, "interface/editor/code_font_contextual_ligatures", PROPERTY_HINT_ENUM, "Default,Disable Contextual Alternates (Coding Ligatures),Use Custom OpenType Feature Set", PROPERTY_USAGE_DEFAULT);
 	_initial_set("interface/editor/code_font_custom_opentype_features", "");
 	_initial_set("interface/editor/code_font_custom_variations", "");
 	_initial_set("interface/editor/font_antialiased", true);
 	_initial_set("interface/editor/font_hinting", 0);
-	hints["interface/editor/font_hinting"] = PropertyInfo(Variant::INT, "interface/editor/font_hinting", PROPERTY_HINT_ENUM, "Auto,None,Light,Normal", PROPERTY_USAGE_DEFAULT);
+#ifdef OSX_ENABLED
+	hints["interface/editor/font_hinting"] = PropertyInfo(Variant::INT, "interface/editor/font_hinting", PROPERTY_HINT_ENUM, "Auto (None),None,Light,Normal", PROPERTY_USAGE_DEFAULT);
+#else
+	hints["interface/editor/font_hinting"] = PropertyInfo(Variant::INT, "interface/editor/font_hinting", PROPERTY_HINT_ENUM, "Auto (Light),None,Light,Normal", PROPERTY_USAGE_DEFAULT);
+#endif
 	_initial_set("interface/editor/main_font", "");
 	hints["interface/editor/main_font"] = PropertyInfo(Variant::STRING, "interface/editor/main_font", PROPERTY_HINT_GLOBAL_FILE, "*.ttf,*.otf", PROPERTY_USAGE_DEFAULT);
 	_initial_set("interface/editor/main_font_bold", "");
@@ -357,7 +380,6 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 	hints["interface/editor/single_window_mode"] = PropertyInfo(Variant::BOOL, "interface/editor/single_window_mode", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_RESTART_IF_CHANGED);
 	_initial_set("interface/editor/hide_console_window", false);
 	_initial_set("interface/editor/save_each_scene_on_quit", true); // Regression
-	_initial_set("interface/editor/quit_confirmation", true);
 
 	// Theme
 	_initial_set("interface/theme/preset", "Default");
@@ -636,6 +658,10 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 	_initial_set("editors/animation/default_create_reset_tracks", true);
 	_initial_set("editors/animation/onion_layers_past_color", Color(1, 0, 0));
 	_initial_set("editors/animation/onion_layers_future_color", Color(0, 1, 0));
+
+	// Visual editors
+	_initial_set("editors/visual_editors/minimap_opacity", 0.85);
+	hints["editors/visual_editors/minimap_opacity"] = PropertyInfo(Variant::FLOAT, "editors/visual_editors/minimap_opacity", PROPERTY_HINT_RANGE, "0.0,1.0,0.01", PROPERTY_USAGE_DEFAULT);
 
 	/* Run */
 
@@ -933,27 +959,16 @@ void EditorSettings::create() {
 
 		_create_script_templates(dir->get_current_dir().plus_file("script_templates"));
 
-		if (dir->change_dir("projects") != OK) {
-			dir->make_dir("projects");
-		} else {
-			dir->change_dir("..");
+		{
+			// Validate/create project-specific editor settings dir.
+			DirAccessRef da = DirAccess::create(DirAccess::ACCESS_RESOURCES);
+			if (da->change_dir(EditorSettings::PROJECT_EDITOR_SETTINGS_PATH) != OK) {
+				Error err = da->make_dir_recursive(EditorSettings::PROJECT_EDITOR_SETTINGS_PATH);
+				if (err || da->change_dir(EditorSettings::PROJECT_EDITOR_SETTINGS_PATH) != OK) {
+					ERR_FAIL_MSG("Failed to create '" + EditorSettings::PROJECT_EDITOR_SETTINGS_PATH + "' folder.");
+				}
+			}
 		}
-
-		// Validate/create project-specific config dir
-
-		dir->change_dir("projects");
-		String project_config_dir = ProjectSettings::get_singleton()->get_resource_path();
-		if (project_config_dir.ends_with("/")) {
-			project_config_dir = config_path.substr(0, project_config_dir.size() - 1);
-		}
-		project_config_dir = project_config_dir.get_file() + "-" + project_config_dir.md5_text();
-
-		if (dir->change_dir(project_config_dir) != OK) {
-			dir->make_dir(project_config_dir);
-		} else {
-			dir->change_dir("..");
-		}
-		dir->change_dir("..");
 
 		// Validate editor config file
 
@@ -975,7 +990,6 @@ void EditorSettings::create() {
 
 		singleton->save_changed_setting = true;
 		singleton->config_file_path = config_file_path;
-		singleton->project_config_dir = project_config_dir;
 		singleton->settings_dir = config_dir;
 		singleton->data_dir = data_dir;
 		singleton->cache_dir = cache_dir;
@@ -1251,7 +1265,7 @@ String EditorSettings::get_settings_dir() const {
 }
 
 String EditorSettings::get_project_settings_dir() const {
-	return get_settings_dir().plus_file("projects").plus_file(project_config_dir);
+	return EditorSettings::PROJECT_EDITOR_SETTINGS_PATH;
 }
 
 String EditorSettings::get_text_editor_themes_dir() const {

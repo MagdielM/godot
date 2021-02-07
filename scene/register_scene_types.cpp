@@ -175,6 +175,7 @@
 #include "scene/resources/video_stream.h"
 #include "scene/resources/visual_shader.h"
 #include "scene/resources/visual_shader_nodes.h"
+#include "scene/resources/visual_shader_sdf_nodes.h"
 #include "scene/resources/world_2d.h"
 #include "scene/resources/world_3d.h"
 #include "scene/resources/world_margin_shape_3d.h"
@@ -556,19 +557,14 @@ void register_scene_types() {
 	ClassDB::register_class<VisualShaderNodeDeterminant>();
 	ClassDB::register_class<VisualShaderNodeScalarDerivativeFunc>();
 	ClassDB::register_class<VisualShaderNodeVectorDerivativeFunc>();
-	ClassDB::register_class<VisualShaderNodeScalarClamp>();
-	ClassDB::register_class<VisualShaderNodeVectorClamp>();
+	ClassDB::register_class<VisualShaderNodeClamp>();
 	ClassDB::register_class<VisualShaderNodeFaceForward>();
 	ClassDB::register_class<VisualShaderNodeOuterProduct>();
-	ClassDB::register_class<VisualShaderNodeVectorScalarStep>();
-	ClassDB::register_class<VisualShaderNodeScalarSmoothStep>();
-	ClassDB::register_class<VisualShaderNodeVectorSmoothStep>();
-	ClassDB::register_class<VisualShaderNodeVectorScalarSmoothStep>();
+	ClassDB::register_class<VisualShaderNodeSmoothStep>();
+	ClassDB::register_class<VisualShaderNodeStep>();
 	ClassDB::register_class<VisualShaderNodeVectorDistance>();
 	ClassDB::register_class<VisualShaderNodeVectorRefract>();
-	ClassDB::register_class<VisualShaderNodeScalarInterp>();
-	ClassDB::register_class<VisualShaderNodeVectorInterp>();
-	ClassDB::register_class<VisualShaderNodeVectorScalarMix>();
+	ClassDB::register_class<VisualShaderNodeMix>();
 	ClassDB::register_class<VisualShaderNodeVectorCompose>();
 	ClassDB::register_class<VisualShaderNodeTransformCompose>();
 	ClassDB::register_class<VisualShaderNodeVectorDecompose>();
@@ -594,13 +590,18 @@ void register_scene_types() {
 	ClassDB::register_class<VisualShaderNodeCubemapUniform>();
 	ClassDB::register_class<VisualShaderNodeIf>();
 	ClassDB::register_class<VisualShaderNodeSwitch>();
-	ClassDB::register_class<VisualShaderNodeScalarSwitch>();
 	ClassDB::register_class<VisualShaderNodeFresnel>();
 	ClassDB::register_class<VisualShaderNodeExpression>();
 	ClassDB::register_class<VisualShaderNodeGlobalExpression>();
 	ClassDB::register_class<VisualShaderNodeIs>();
 	ClassDB::register_class<VisualShaderNodeCompare>();
 	ClassDB::register_class<VisualShaderNodeMultiplyAdd>();
+
+	ClassDB::register_class<VisualShaderNodeSDFToScreenUV>();
+	ClassDB::register_class<VisualShaderNodeScreenUVToSDF>();
+	ClassDB::register_class<VisualShaderNodeTextureSDF>();
+	ClassDB::register_class<VisualShaderNodeTextureSDFNormal>();
+	ClassDB::register_class<VisualShaderNodeSDFRaymarch>();
 
 	ClassDB::register_class<ShaderMaterial>();
 	ClassDB::register_virtual_class<CanvasItem>();
@@ -928,6 +929,16 @@ void register_scene_types() {
 	ClassDB::add_compatibility_class("VisualShaderNodeScalarFunc", "VisualShaderNodeFloatFunc");
 	ClassDB::add_compatibility_class("VisualShaderNodeScalarOp", "VisualShaderNodeFloatOp");
 	ClassDB::add_compatibility_class("VisualShaderNodeScalarUniform", "VisualShaderNodeFloatUniform");
+	ClassDB::add_compatibility_class("VisualShaderNodeScalarClamp", "VisualShaderNodeClamp");
+	ClassDB::add_compatibility_class("VisualShaderNodeVectorClamp", "VisualShaderNodeClamp");
+	ClassDB::add_compatibility_class("VisualShaderNodeScalarInterp", "VisualShaderNodeMix");
+	ClassDB::add_compatibility_class("VisualShaderNodeVectorInterp", "VisualShaderNodeMix");
+	ClassDB::add_compatibility_class("VisualShaderNodeVectorScalarMix", "VisualShaderNodeMix");
+	ClassDB::add_compatibility_class("VisualShaderNodeScalarSmoothStep", "VisualShaderNodeSmoothStep");
+	ClassDB::add_compatibility_class("VisualShaderNodeVectorSmoothStep", "VisualShaderNodeSmoothStep");
+	ClassDB::add_compatibility_class("VisualShaderNodeVectorScalarSmoothStep", "VisualShaderNodeSmoothStep");
+	ClassDB::add_compatibility_class("VisualShaderNodeVectorScalarStep", "VisualShaderNodeStep");
+	ClassDB::add_compatibility_class("VisualShaderNodeScalarSwitch", "VisualShaderNodeSwitch");
 	ClassDB::add_compatibility_class("World", "World3D");
 	ClassDB::add_compatibility_class("StreamTexture", "StreamTexture2D");
 	ClassDB::add_compatibility_class("Light2D", "PointLight2D");
