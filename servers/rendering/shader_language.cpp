@@ -6160,10 +6160,10 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 					return ERR_PARSE_ERROR;
 				}
 
-				int type_end = included.find(";");
-				if (type_end == -1) {
-					_set_error("Shader include shader_type not found");
-					return ERR_PARSE_ERROR;
+				//Check the included shader_type and make sure it is import
+				if(!included.match("shader_type include;*")){
+						_set_error("Expected 'shader_type include;' at the beginning of the imported shader.");
+						return ERR_PARSE_ERROR;
 				}
 
 				const String real_path = shader->get_path();
