@@ -6005,14 +6005,14 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 	Token tk = _get_token();
 
 	if (tk.type != TK_SHADER_TYPE) {
-		_set_error("Expected 'shader_type' at the beginning of shader. Valid types are: " + _get_shader_type_list(p_shader_types));
+		_set_error("Expected 'shader_type' at the beginning of shader. Valid types are: " + _get_shader_type_list(p_shader_types)+".");
 		return ERR_PARSE_ERROR;
 	}
 
 	tk = _get_token();
 
 	if (tk.type != TK_IDENTIFIER) {
-		_set_error("Expected identifier after 'shader_type', indicating type of shader. Valid types are: " + _get_shader_type_list(p_shader_types));
+		_set_error("Expected identifier after 'shader_type', indicating type of shader. Valid types are: " + _get_shader_type_list(p_shader_types)+".");
 		return ERR_PARSE_ERROR;
 	}
 
@@ -6055,13 +6055,13 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 				String path = tk.text;
 
 				if (path.is_empty()) {
-					_set_error("Invalid path");
+					_set_error("Invalid shader import path. A valid path should look like this: \"res://imported_shader.shader\"");
 					return ERR_PARSE_ERROR;
 				}
 
 				RES res = ResourceLoader::load(path);
 				if (res.is_null()) {
-					_set_error("Shader include load failed");
+					_set_error("Failed to load imported shader. Please make sure the path is correct.");
 					return ERR_PARSE_ERROR;
 				}
 
@@ -6074,45 +6074,53 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 
 				tk = _get_token();
 				if (tk.type != TK_SEMICOLON) {
-					_set_error("Expected semicolon.");
+					_set_error("Expected ';' after 'import <path>'.");
 					return ERR_PARSE_ERROR;
 				}
 
 				Ref<Shader> shader = res;
 				if (shader.is_null()) {
-					_set_error("Shader include resource type is wrong");
+					_set_error("Imported shader has the wrong resource type.");
 					return ERR_PARSE_ERROR;
 				}
 
 				String included = shader->get_code();
 				if (included.is_empty()) {
-					_set_error("Shader include not found");
+					_set_error("Imported shader is empty.");
 					return ERR_PARSE_ERROR;
 				}
 
-				int type_end = included.find(";");
-				if (type_end == -1) {
-					_set_error("Shader include shader_type not found");
-					return ERR_PARSE_ERROR;
+				//Check the included shader_type and make sure it is import
+				if(!included.match("shader_type import;*")){
+						_set_error("Expected 'shader_type import;' at the beginning of the imported shader.");
+						return ERR_PARSE_ERROR;
 				}
 
+
+
+				//TODO: Yeah, we need to handle this better. Circular dependencies and all that
 				const String real_path = shader->get_path();
 				if (includes.has(real_path)) {
 					//Already included, skip.
 					return ERR_PARSE_ERROR;
 				}
-
 				//Mark as included
 				includes.insert(real_path);
 
+
+
+				//TODO: This is not ideal either. We will probably need to add an additional token to mark when we want to go up again.
 				include_depth++;
 				if (include_depth > 25) {
 					_set_error("Shader max include depth exceeded");
 					return ERR_PARSE_ERROR;
 				}
 
+
 				//Remove "shader_type xyz;" prefix from included files
+				int type_end = included.find(";");
 				included = included.substr(type_end + 1, included.length());
+
 
 				code = code.insert(char_idx, included);
 			} break;
