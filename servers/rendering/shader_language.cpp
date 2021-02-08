@@ -6091,8 +6091,8 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 				}
 
 				//Check the included shader_type and make sure it is import
-				if(!included.match("shader_type import;*")){
-						_set_error("Expected 'shader_type import;' at the beginning of the imported shader.");
+				if(!included.match("shader_type include;*")){
+						_set_error("Expected 'shader_type include;' at the beginning of the imported shader.");
 						return ERR_PARSE_ERROR;
 				}
 
