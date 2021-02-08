@@ -6096,7 +6096,10 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 						return ERR_PARSE_ERROR;
 				}
 
+				//TODO: I don't think there is anything stopping use from running a check on the imported shader to ensure it has no errors to display a simple warning.
+				//		We need this to make it easier to backtrack errors
 
+				//TODO: Count line numbers of the original file only when displaying an error message (since at any line include could add more stuff)
 
 				//TODO: Yeah, we need to handle this better. Circular dependencies and all that
 				const String real_path = shader->get_path();
@@ -6109,7 +6112,7 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 
 
 
-				//TODO: This is not ideal either. We will probably need to add an additional token to mark when we want to go up again.
+				//TODO: This is not ideal either. We will probably need to add an additional token to mark when we want to go up again to decrement shader depth.
 				include_depth++;
 				if (include_depth > 25) {
 					_set_error("Shader max include depth exceeded");

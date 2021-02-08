@@ -804,6 +804,7 @@ private:
 			return;
 		}
 
+		//TODO: Use a second line number counter, that only increases when the import depth is 0.
 		error_line = tk_line;
 		error_set = true;
 		error_str = p_str;
