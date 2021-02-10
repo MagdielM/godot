@@ -220,8 +220,10 @@ const char *ShaderLanguage::token_names[TK_MAX] = {
 	"REPEAT_ENABLE",
 	"REPEAT_DISABLE",
 	"SHADER_TYPE",
-	"IMPORT_SHADER",
 	"CURSOR",
+	"IMPORT_SHADER",
+	"IMPORT_SHADER_END",
+	"QUOTE",
 	"ERROR",
 	"EOF",
 };
@@ -336,8 +338,8 @@ const ShaderLanguage::KeyWord ShaderLanguage::keyword_list[] = {
 	{ TK_REPEAT_DISABLE, "repeat_disable" },
 	{ TK_SHADER_TYPE, "shader_type" },
 	{ TK_IMPORT, "import" },
+	{ TK_IMPORT_END, "IMPORT_SHADER_END" },		//we use this to temporarily mark the end of an imported shader to properly keep track of the depth
 	{ TK_QUOTE, "\"" },
-
 	{ TK_ERROR, nullptr }
 };
 
@@ -356,7 +358,7 @@ ShaderLanguage::Token ShaderLanguage::_get_token() {
 			case ' ':
 				continue;
 			case '\n':
-				tk_line++;
+				_next_line();
 				continue;
 			case '/': {
 				switch (GETCHAR(0)) {
@@ -371,7 +373,7 @@ ShaderLanguage::Token ShaderLanguage::_get_token() {
 								char_idx += 2;
 								break;
 							} else if (GETCHAR(0) == '\n') {
-								tk_line++;
+								_next_line();
 							}
 
 							char_idx++;
@@ -382,7 +384,7 @@ ShaderLanguage::Token ShaderLanguage::_get_token() {
 
 						while (true) {
 							if (GETCHAR(0) == '\n') {
-								tk_line++;
+								_next_line();
 								char_idx++;
 								break;
 							}
@@ -923,6 +925,8 @@ void ShaderLanguage::clear() {
 
 	error_line = 0;
 	tk_line = 1;
+	source_line = 1;
+	include_depth = 0;
 	char_idx = 0;
 	error_set = false;
 	error_str = "";
@@ -3063,7 +3067,7 @@ int ShaderLanguage::get_cardinality(DataType p_type) {
 bool ShaderLanguage::_get_completable_identifier(BlockNode *p_block, CompletionType p_type, StringName &identifier) {
 	identifier = StringName();
 
-	TkPos pos = { 0, 0 };
+	TkPos pos = { 0, 0, 0};
 
 	Token tk = _get_token();
 
@@ -6110,7 +6114,7 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 
 	stages = &p_functions;
 	Set<String> includes;
-	int include_depth = 0;
+	include_depth = 0;
 
 	while (tk.type != TK_EOF) {
 		switch (tk.type) {
@@ -6183,7 +6187,6 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 
 
 
-				//TODO: This is not ideal either. We will probably need to add an additional token to mark when we want to go up again to decrement shader depth.
 				include_depth++;
 				if (include_depth > 25) {
 					_set_error("Shader max include depth exceeded");
@@ -6192,8 +6195,29 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 
 				//Remove "shader_type xyz;" prefix from included files
 				included = included.substr(type_end + 1, included.length());
+				
+
+
+				//String marker_token;
+				int idx = 0;
+				while (keyword_list[idx].text) {
+					if (TK_IMPORT_END == keyword_list[idx].token) {
+				//		marker_token = keyword_list[idx].text;
+						break;
+					}
+					idx++;
+				}
+				included = included.insert(included.length(), keyword_list[idx].text);	//create a marker so we know when we go back up again
 
 				code = code.insert(char_idx, included);
+
+			} break;
+			case TK_IMPORT_END: {
+				include_depth--;
+				if(include_depth < 0) {
+					_set_error("Found unexpected import end token. Please make sure you shader doesn't contain '"+_get_token().text+"'");
+					return ERR_PARSE_ERROR;
+				}
 			} break;
 			case TK_RENDER_MODE: {
 				while (true) {
@@ -7897,6 +7921,9 @@ Error ShaderLanguage::complete(const String &p_code, const Map<StringName, Funct
 }
 
 String ShaderLanguage::get_error_text() {
+	if(include_depth) {
+		return String("In imported shader: ") +error_str;
+	}
 	return error_str;
 }
 
