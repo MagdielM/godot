@@ -1958,7 +1958,6 @@ void LineEdit::_text_changed() {
 
 void LineEdit::_emit_text_change() {
 	emit_signal("text_changed", text);
-	_change_notify("text");
 	text_changed_dirty = false;
 }
 
@@ -2091,7 +2090,7 @@ bool LineEdit::_set(const StringName &p_name, const Variant &p_value) {
 				update();
 			}
 		}
-		_change_notify();
+		notify_property_list_changed();
 		return true;
 	}
 
@@ -2263,9 +2262,6 @@ void LineEdit::_bind_methods() {
 LineEdit::LineEdit() {
 	text_rid = TS->create_shaped_text();
 	_create_undo_state();
-
-	clear_button_status.press_attempt = false;
-	clear_button_status.pressing_inside = false;
 
 	deselect();
 	set_focus_mode(FOCUS_ALL);

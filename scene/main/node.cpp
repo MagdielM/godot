@@ -367,8 +367,6 @@ void Node::set_physics_process(bool p_process) {
 	} else {
 		remove_from_group("physics_process");
 	}
-
-	_change_notify("physics_process");
 }
 
 bool Node::is_physics_processing() const {
@@ -387,8 +385,6 @@ void Node::set_physics_process_internal(bool p_process_internal) {
 	} else {
 		remove_from_group("physics_process_internal");
 	}
-
-	_change_notify("physics_process_internal");
 }
 
 bool Node::is_physics_processing_internal() const {
@@ -466,7 +462,7 @@ uint16_t Node::rpc_config(const StringName &p_method, MultiplayerAPI::RPCMode p_
 		nd.name = p_method;
 		nd.mode = p_mode;
 		data.rpc_methods.push_back(nd);
-		return ((uint16_t)data.rpc_properties.size() - 1) | (1 << 15);
+		return ((uint16_t)data.rpc_methods.size() - 1) | (1 << 15);
 	} else {
 		int c_mid = (~(1 << 15)) & mid;
 		data.rpc_methods.write[c_mid].mode = p_mode;
@@ -555,7 +551,7 @@ Variant Node::_rpc_bind(const Variant **p_args, int p_argcount, Callable::CallEr
 		return Variant();
 	}
 
-	if (p_args[0]->get_type() != Variant::STRING) {
+	if (p_args[0]->get_type() != Variant::STRING_NAME) {
 		r_error.error = Callable::CallError::CALL_ERROR_INVALID_ARGUMENT;
 		r_error.argument = 0;
 		r_error.expected = Variant::STRING;
@@ -584,7 +580,7 @@ Variant Node::_rpc_id_bind(const Variant **p_args, int p_argcount, Callable::Cal
 		return Variant();
 	}
 
-	if (p_args[1]->get_type() != Variant::STRING) {
+	if (p_args[1]->get_type() != Variant::STRING_NAME) {
 		r_error.error = Callable::CallError::CALL_ERROR_INVALID_ARGUMENT;
 		r_error.argument = 1;
 		r_error.expected = Variant::STRING;
@@ -607,7 +603,7 @@ Variant Node::_rpc_unreliable_bind(const Variant **p_args, int p_argcount, Calla
 		return Variant();
 	}
 
-	if (p_args[0]->get_type() != Variant::STRING) {
+	if (p_args[0]->get_type() != Variant::STRING_NAME) {
 		r_error.error = Callable::CallError::CALL_ERROR_INVALID_ARGUMENT;
 		r_error.argument = 0;
 		r_error.expected = Variant::STRING;
@@ -636,7 +632,7 @@ Variant Node::_rpc_unreliable_id_bind(const Variant **p_args, int p_argcount, Ca
 		return Variant();
 	}
 
-	if (p_args[1]->get_type() != Variant::STRING) {
+	if (p_args[1]->get_type() != Variant::STRING_NAME) {
 		r_error.error = Callable::CallError::CALL_ERROR_INVALID_ARGUMENT;
 		r_error.argument = 1;
 		r_error.expected = Variant::STRING;
@@ -863,8 +859,6 @@ void Node::set_process(bool p_process) {
 	} else {
 		remove_from_group("process");
 	}
-
-	_change_notify("process");
 }
 
 bool Node::is_processing() const {
@@ -883,8 +877,6 @@ void Node::set_process_internal(bool p_process_internal) {
 	} else {
 		remove_from_group("process_internal");
 	}
-
-	_change_notify("process_internal");
 }
 
 bool Node::is_processing_internal() const {
