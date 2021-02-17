@@ -401,4 +401,5 @@ ShaderTypes::ShaderTypes() {
 	shader_types.insert("canvas_item");
 	shader_types.insert("particles");
 	shader_types.insert("sky");
+	shader_types.insert("import");
 }
