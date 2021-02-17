@@ -43,7 +43,9 @@ Shader::Mode Shader::get_mode() const {
 void Shader::set_code(const String &p_code) {
 	String type = ShaderLanguage::get_shader_type(p_code);
 
-	if (type == "canvas_item") {
+	if (type == "import") {
+		mode = MODE_IMPORT;
+	} else if (type == "canvas_item") {
 		mode = MODE_CANVAS_ITEM;
 	} else if (type == "particles") {
 		mode = MODE_PARTICLES;
