@@ -68,6 +68,21 @@ public:
 class ShaderEditor : public PanelContainer {
 	GDCLASS(ShaderEditor, PanelContainer);
 
+	struct ShaderDependencyNode {
+		Shader *shader;
+		List<Shader *> dependencies;
+
+		ShaderDependencyNode(Shader *);
+	};
+
+	struct ShaderDependencyGraph {
+		List<ShaderDependencyNode> nodes;
+		void add_node(ShaderDependencyNode);
+		void create_edge(ShaderDependencyNode, Shader *);
+		List<Shader *> get_dependencies(Shader *);
+		List<Shader *> get_shaders();
+	};
+
 	enum {
 		EDIT_UNDO,
 		EDIT_REDO,
@@ -129,7 +144,7 @@ protected:
 public:
 	void apply_shaders();
 
-	static void refresh_shader_dependencies();
+	void refresh_shader_dependencies();
 
 	void ensure_select_current();
 	void edit(const Ref<Shader> &p_shader);

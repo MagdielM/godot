@@ -180,7 +180,9 @@ void ShaderTextEditor::_check_shader_mode() {
 
 	Shader::Mode mode;
 
-	if (type == "canvas_item") {
+	if (type == "import") {
+		mode = Shader::MODE_IMPORT;
+	} else if (type == "canvas_item") {
 		mode = Shader::MODE_CANVAS_ITEM;
 	} else if (type == "particles") {
 		mode = Shader::MODE_PARTICLES;
@@ -462,9 +464,39 @@ void ShaderEditor::refresh_shader_dependencies() {
 	//For now go through cached shaders, which are usually(?) all shaders that are currently used in editor
 	//Best solution would be to create a dependency graph about all #includes and use it
 
+	ShaderDependencyGraph graph;
 
+	String code = shader->get_code(); // Build dependency graph starting from edited shader
+	String import_statement("import \"res");
+
+	int cursor = 0;
+	cursor = code.find(import_statement, cursor);
+
+	if (cursor) {
+		ShaderDependencyNode new_node(shader.ptr());
+
+		while (cursor) {
+			cursor = code.find(import_statement, cursor);
+			if (code.substr(cursor - 2, 2) != "//" && code.substr(cursor - 2, 2) != "/*") { // Ensure imports in comments are omitted
+				String import_path;
+
+				int path_start = cursor + import_statement.length();
+				int path_end = code.find_char('\"', path_start);
+
+				import_path = code.substr(path_start, path_end);
+
+				Shader *dependency = Object::cast_to<Shader>(*ResourceLoader::load(import_path));
+				new_node.dependencies.push_back(dependency);
+				cursor = path_end + 1;
+			}
+		}
+		graph.nodes.push_back(new_node);
+	}
+
+	graph.
 
 	List<RES> cached;
+
 	ResourceCache::get_cached_resources(&cached);
 
 	for (int i = 0; i < cached.size(); i++) {
@@ -572,6 +604,29 @@ void ShaderEditor::_make_context_menu(bool p_selection, Vector2 p_position) {
 	context_menu->set_position(get_global_transform().xform(p_position));
 	context_menu->set_size(Vector2(1, 1));
 	context_menu->popup();
+}
+
+ShaderEditor::ShaderDependencyNode::ShaderDependencyNode(Shader *s) :
+		shader(s) {}
+
+void ShaderEditor::ShaderDependencyGraph::create_edge(ShaderDependencyNode node, Shader *shader) {
+	node.dependencies.push_back(shader);
+}
+
+List<Shader *> ShaderEditor::ShaderDependencyGraph::get_dependencies(Shader *shader) {
+	for (int i = 0; i < nodes.size(); i++) {
+		if (nodes[i].shader == shader) {
+			return nodes[i].dependencies;
+		}
+	}
+}
+
+List<Shader *> ShaderEditor::ShaderDependencyGraph::get_shaders() {
+	List<Shader *> shaders;
+	for (int i = 0; i < nodes.size(); i++) {
+		shaders.push_back(nodes[i].shader);
+	}
+	return shaders;
 }
 
 ShaderEditor::ShaderEditor(EditorNode *p_node) {
