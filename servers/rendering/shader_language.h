@@ -155,6 +155,8 @@ public:
 		TK_ARG_OUT,
 		TK_ARG_INOUT,
 		TK_RENDER_MODE,
+		TK_IMPORT,
+		TK_QUOTE,
 		TK_HINT_WHITE_TEXTURE,
 		TK_HINT_BLACK_TEXTURE,
 		TK_HINT_NORMAL_TEXTURE,
@@ -780,7 +782,7 @@ private:
 		TokenType token;
 		const char *text;
 	};
-
+	
 	static const KeyWord keyword_list[];
 
 	GlobalVariableGetTypeFunc global_var_get_type_func;
