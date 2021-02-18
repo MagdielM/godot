@@ -460,40 +460,8 @@ void ShaderEditor::apply_shaders() {
 }
 
 void ShaderEditor::refresh_shader_dependencies() {
-	//We could use the arguments to find exactly what shaders we should update that depend on the argument shader.
-	//For now go through cached shaders, which are usually(?) all shaders that are currently used in editor
-	//Best solution would be to create a dependency graph about all #includes and use it
-
-	ShaderDependencyGraph graph;
-
-	String code = shader->get_code(); // Build dependency graph starting from edited shader
-	String import_statement("import \"res");
-
-	int cursor = 0;
-	cursor = code.find(import_statement, cursor);
-
-	if (cursor) {
-		ShaderDependencyNode new_node(shader.ptr());
-
-		while (cursor) {
-			cursor = code.find(import_statement, cursor);
-			if (code.substr(cursor - 2, 2) != "//" && code.substr(cursor - 2, 2) != "/*") { // Ensure imports in comments are omitted
-				String import_path;
-
-				int path_start = cursor + import_statement.length();
-				int path_end = code.find_char('\"', path_start);
-
-				import_path = code.substr(path_start, path_end);
-
-				Shader *dependency = Object::cast_to<Shader>(*ResourceLoader::load(import_path));
-				new_node.dependencies.push_back(dependency);
-				cursor = path_end + 1;
-			}
-		}
-		graph.nodes.push_back(new_node);
-	}
-
-	graph.
+	//ShaderDependencyGraph graph;
+	//graph.populate(shader.ptr());
 
 	List<RES> cached;
 
@@ -606,27 +574,81 @@ void ShaderEditor::_make_context_menu(bool p_selection, Vector2 p_position) {
 	context_menu->popup();
 }
 
-ShaderEditor::ShaderDependencyNode::ShaderDependencyNode(Shader *s) :
+ShaderEditor::ShaderDependencyNode::ShaderDependencyNode(Ref<Shader> s) :
 		shader(s) {}
 
-void ShaderEditor::ShaderDependencyGraph::create_edge(ShaderDependencyNode node, Shader *shader) {
-	node.dependencies.push_back(shader);
+bool operator<(ShaderEditor::ShaderDependencyNode left, ShaderEditor::ShaderDependencyNode right) {
+	return left.shader < right.shader;
 }
 
-List<Shader *> ShaderEditor::ShaderDependencyGraph::get_dependencies(Shader *shader) {
-	for (int i = 0; i < nodes.size(); i++) {
-		if (nodes[i].shader == shader) {
-			return nodes[i].dependencies;
+bool operator==(ShaderEditor::ShaderDependencyNode left, ShaderEditor::ShaderDependencyNode right) {
+	return left.shader == right.shader;
+}
+
+void ShaderEditor::ShaderDependencyGraph::populate(Ref<Shader> shader) {
+	tracker.clear();
+
+	//Error error = OK;
+	ShaderDependencyNode node(shader);
+	populate(node);
+}
+
+void ShaderEditor::ShaderDependencyGraph::populate(ShaderDependencyNode node) {
+	ERR_FAIL_COND_MSG(tracker.find(node), vformat("Shader %s contains a cyclic import. Skipping...", node.shader->get_name()));
+
+	nodes.insert(node);
+	tracker.push_back(node);
+	String code = node.shader->get_code(); // Build dependency graph starting from edited shader
+	String import_statement("import \"");
+
+	int cursor = 0;
+	cursor = code.find(import_statement, cursor);
+
+	while (cursor > 0) {
+		if (code.substr(cursor - 2, 2) == "//" || code.substr(cursor - 2, 2) == "/*") { // Ensure imports in comments are omitted
+			cursor = code.find_char('\n', cursor);
+		} else {
+			String import_path;
+
+			int path_start = cursor + import_statement.length();
+			int path_end = code.find_char('"', path_start);
+
+			import_path = code.substr(path_start, path_end - path_start); // This should return a resource path
+
+			ShaderDependencyNode new_node(Object::cast_to<Shader>(*ResourceLoader::load(import_path)));
+			populate(new_node);
+			node.dependencies.insert(new_node);
+			cursor = path_end + 1;
+		}
+		cursor = code.find(import_statement, cursor);
+		continue;
+	}
+	tracker.erase(node);
+}
+
+Set<ShaderEditor::ShaderDependencyNode>::Element *ShaderEditor::ShaderDependencyGraph::find(Ref<Shader> shader) {
+	for (auto E = nodes.front(); E; E = E->next()) {
+		if (E->get().shader == shader) {
+			return E;
 		}
 	}
+	return nullptr;
 }
 
-List<Shader *> ShaderEditor::ShaderDependencyGraph::get_shaders() {
-	List<Shader *> shaders;
-	for (int i = 0; i < nodes.size(); i++) {
-		shaders.push_back(nodes[i].shader);
+// TODO: Test.
+void ShaderEditor::ShaderDependencyGraph::update_shaders() {
+	for (auto E = nodes.front(); E; E = E->next()) {
+		tracker.clear();
+		update_shaders(E->get());
 	}
-	return shaders;
+}
+
+void ShaderEditor::ShaderDependencyGraph::update_shaders(ShaderDependencyNode node) {
+	for (auto E = node.dependencies.front(); E; E = E->next()) {
+		update_shaders(E->get());
+	}
+	Ref<Shader> shader = node.shader;
+	shader->set_code(shader->get_code());
 }
 
 ShaderEditor::ShaderEditor(EditorNode *p_node) {

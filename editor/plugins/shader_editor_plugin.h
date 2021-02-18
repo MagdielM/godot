@@ -68,21 +68,34 @@ public:
 class ShaderEditor : public PanelContainer {
 	GDCLASS(ShaderEditor, PanelContainer);
 
+public:
 	struct ShaderDependencyNode {
-		Shader *shader;
-		List<Shader *> dependencies;
+		Ref<Shader> shader;
+		Set<ShaderDependencyNode> dependencies;
 
-		ShaderDependencyNode(Shader *);
+		ShaderDependencyNode() = default;
+		ShaderDependencyNode(Ref<Shader>);
+
+		friend bool operator<(ShaderDependencyNode, ShaderDependencyNode);
+		friend bool operator==(ShaderDependencyNode, ShaderDependencyNode);
 	};
 
-	struct ShaderDependencyGraph {
-		List<ShaderDependencyNode> nodes;
-		void add_node(ShaderDependencyNode);
-		void create_edge(ShaderDependencyNode, Shader *);
-		List<Shader *> get_dependencies(Shader *);
-		List<Shader *> get_shaders();
+	class ShaderDependencyGraph {
+	public:
+		Set<ShaderDependencyNode> nodes;
+
+		void populate(Ref<Shader>);
+		void update_shaders();
+
+	private:
+		List<ShaderDependencyNode> tracker;
+
+		Set<ShaderEditor::ShaderDependencyNode>::Element *find(Ref<Shader>);
+		void populate(ShaderDependencyNode);
+		void update_shaders(ShaderDependencyNode);
 	};
 
+private:
 	enum {
 		EDIT_UNDO,
 		EDIT_REDO,
