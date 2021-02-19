@@ -173,6 +173,7 @@ void ShaderTextEditor::_load_theme_settings() {
 	syntax_highlighter->clear_color_regions();
 	syntax_highlighter->add_color_region("/*", "*/", comment_color, false);
 	syntax_highlighter->add_color_region("//", "", comment_color, true);
+	syntax_highlighter->add_color_region("\"", "\"", member_variable_color, true);
 }
 
 void ShaderTextEditor::_check_shader_mode() {

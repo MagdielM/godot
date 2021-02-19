@@ -30,6 +30,7 @@
 
 #include "shader_language.h"
 
+#include "core/config/engine.h"
 #include "core/io/resource_loader.h"
 #include "core/os/os.h"
 #include "core/string/print_string.h"
@@ -222,6 +223,9 @@ const char *ShaderLanguage::token_names[TK_MAX] = {
 	"SHADER_TYPE",
 	"IMPORT_SHADER",
 	"CURSOR",
+	"IMPORT_SHADER",
+	"IMPORT_SHADER_END",
+	"QUOTE",
 	"ERROR",
 	"EOF",
 };
@@ -336,8 +340,8 @@ const ShaderLanguage::KeyWord ShaderLanguage::keyword_list[] = {
 	{ TK_REPEAT_DISABLE, "repeat_disable" },
 	{ TK_SHADER_TYPE, "shader_type" },
 	{ TK_IMPORT, "import" },
+	{ TK_IMPORT_END, "IMPORT_SHADER_END" },		//we use this to temporarily mark the end of an imported shader to properly keep track of the depth
 	{ TK_QUOTE, "\"" },
-
 	{ TK_ERROR, nullptr }
 };
 
@@ -356,7 +360,7 @@ ShaderLanguage::Token ShaderLanguage::_get_token() {
 			case ' ':
 				continue;
 			case '\n':
-				tk_line++;
+				_next_line();
 				continue;
 			case '/': {
 				switch (GETCHAR(0)) {
@@ -371,7 +375,7 @@ ShaderLanguage::Token ShaderLanguage::_get_token() {
 								char_idx += 2;
 								break;
 							} else if (GETCHAR(0) == '\n') {
-								tk_line++;
+								_next_line();
 							}
 
 							char_idx++;
@@ -382,7 +386,7 @@ ShaderLanguage::Token ShaderLanguage::_get_token() {
 
 						while (true) {
 							if (GETCHAR(0) == '\n') {
-								tk_line++;
+								_next_line();
 								char_idx++;
 								break;
 							}
@@ -923,6 +927,8 @@ void ShaderLanguage::clear() {
 
 	error_line = 0;
 	tk_line = 1;
+	source_line = 1;
+	include_depth = 0;
 	char_idx = 0;
 	error_set = false;
 	error_str = "";
@@ -3063,7 +3069,7 @@ int ShaderLanguage::get_cardinality(DataType p_type) {
 bool ShaderLanguage::_get_completable_identifier(BlockNode *p_block, CompletionType p_type, StringName &identifier) {
 	identifier = StringName();
 
-	TkPos pos = { 0, 0 };
+	TkPos pos = { 0, 0, 0};
 
 	Token tk = _get_token();
 
@@ -6069,7 +6075,7 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 	Token tk = _get_token();
 
 	if (tk.type != TK_SHADER_TYPE) {
-		_set_error("Expected 'shader_type' at the beginning of shader. Valid types are: " + _get_shader_type_list(p_shader_types));
+		_set_error("Expected 'shader_type' at the beginning of shader. Valid types are: " + _get_shader_type_list(p_shader_types)+".");
 		return ERR_PARSE_ERROR;
 	}
 
@@ -6082,7 +6088,7 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 	}
 
 	if (tk.type != TK_IDENTIFIER) {
-		_set_error("Expected identifier after 'shader_type', indicating type of shader. Valid types are: " + _get_shader_type_list(p_shader_types));
+		_set_error("Expected identifier after 'shader_type', indicating type of shader. Valid types are: " + _get_shader_type_list(p_shader_types)+".");
 		return ERR_PARSE_ERROR;
 	}
 
@@ -6108,8 +6114,10 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 	int instance_index = 0;
 	ShaderNode::Uniform::Scope uniform_scope = ShaderNode::Uniform::SCOPE_LOCAL;
 
+	stages = &p_functions;
 	Set<String> includes;
-	int include_depth = 0;
+	include_depth = 0;
+
 	while (tk.type != TK_EOF) {
 		switch (tk.type) {
 			case TK_IMPORT: {
@@ -6123,13 +6131,13 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 				String path = tk.text;
 
 				if (path.is_empty()) {
-					_set_error("Invalid path");
+					_set_error("Invalid shader import path. A valid path should look like this: \"res://imported_shader.shader\"");
 					return ERR_PARSE_ERROR;
 				}
 
 				RES res = ResourceLoader::load(path);
 				if (res.is_null()) {
-					_set_error("Shader include load failed");
+					_set_error("Failed to load imported shader. Please make sure the path is correct.");
 					return ERR_PARSE_ERROR;
 				}
 
@@ -6142,36 +6150,43 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 
 				tk = _get_token();
 				if (tk.type != TK_SEMICOLON) {
-					_set_error("Expected semicolon.");
+					_set_error("Expected ';' after 'import <path>'.");
 					return ERR_PARSE_ERROR;
 				}
 
 				Ref<Shader> shader = res;
 				if (shader.is_null()) {
-					_set_error("Shader include resource type is wrong");
+					_set_error("Imported shader has the wrong resource type.");
 					return ERR_PARSE_ERROR;
 				}
 
 				String included = shader->get_code();
 				if (included.is_empty()) {
-					_set_error("Shader include not found");
+					_set_error("Imported shader is empty.");
 					return ERR_PARSE_ERROR;
 				}
 
-				int type_end = included.find(";");
-				if (type_end == -1) {
-					_set_error("Shader include shader_type not found");
-					return ERR_PARSE_ERROR;
+				//Check the included shader_type and make sure it is import
+				if(!included.match("shader_type include;*")){
+						_set_error("Expected 'shader_type include;' at the beginning of the imported shader.");
+						return ERR_PARSE_ERROR;
 				}
 
+				//TODO: I don't think there is anything stopping use from running a check on the imported shader to ensure it has no errors to display a simple warning.
+				//		We need this to make it easier to backtrack errors
+
+				//TODO: Count line numbers of the original file only when displaying an error message (since at any line include could add more stuff)
+
+				//TODO: Yeah, we need to handle this better. Circular dependencies and all that
 				const String real_path = shader->get_path();
 				if (includes.has(real_path)) {
 					//Already included, skip.
 					return ERR_PARSE_ERROR;
 				}
-
 				//Mark as included
 				includes.insert(real_path);
+
+
 
 				include_depth++;
 				if (include_depth > 25) {
@@ -6179,10 +6194,33 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 					return ERR_PARSE_ERROR;
 				}
 
+
 				//Remove "shader_type xyz;" prefix from included files
+				int type_end = included.find(";");
 				included = included.substr(type_end + 1, included.length());
+				
+
+
+				//String marker_token;
+				int idx = 0;
+				while (keyword_list[idx].text) {
+					if (TK_IMPORT_END == keyword_list[idx].token) {
+				//		marker_token = keyword_list[idx].text;
+						break;
+					}
+					idx++;
+				}
+				included = included.insert(included.length(), keyword_list[idx].text);	//create a marker so we know when we go back up again
 
 				code = code.insert(char_idx, included);
+
+			} break;
+			case TK_IMPORT_END: {
+				include_depth--;
+				if(include_depth < 0) {
+					_set_error("Found unexpected import end token. Please make sure you shader doesn't contain '"+_get_token().text+"'");
+					return ERR_PARSE_ERROR;
+				}
 			} break;
 			case TK_RENDER_MODE: {
 				while (true) {
@@ -7886,6 +7924,9 @@ Error ShaderLanguage::complete(const String &p_code, const Map<StringName, Funct
 }
 
 String ShaderLanguage::get_error_text() {
+	if(include_depth) {
+		return String("In imported shader: ") +error_str;
+	}
 	return error_str;
 }
 

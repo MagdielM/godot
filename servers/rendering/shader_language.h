@@ -44,6 +44,7 @@ public:
 	struct TkPos {
 		int char_idx;
 		int tk_line;
+		int src_line;
 	};
 
 	enum TokenType {
@@ -155,8 +156,6 @@ public:
 		TK_ARG_OUT,
 		TK_ARG_INOUT,
 		TK_RENDER_MODE,
-		TK_IMPORT,
-		TK_QUOTE,
 		TK_HINT_WHITE_TEXTURE,
 		TK_HINT_BLACK_TEXTURE,
 		TK_HINT_NORMAL_TEXTURE,
@@ -182,6 +181,9 @@ public:
 		TK_REPEAT_DISABLE,
 		TK_SHADER_TYPE,
 		TK_CURSOR,
+		TK_IMPORT,
+		TK_IMPORT_END,
+		TK_QUOTE,
 		TK_ERROR,
 		TK_EOF,
 		TK_MAX
@@ -794,6 +796,15 @@ private:
 	String code;
 	int char_idx;
 	int tk_line;
+	int include_depth;
+	int source_line;	//Since we add additional lines to the code with every import statement the tk_line no longer matches the line in the source file.
+
+	void _next_line(){
+		tk_line++;
+		if(include_depth == 0){
+			source_line++;
+		}
+	}
 
 	StringName current_function;
 	bool last_const = false;
@@ -802,12 +813,14 @@ private:
 		TkPos tkp;
 		tkp.char_idx = char_idx;
 		tkp.tk_line = tk_line;
+		tkp.src_line = source_line;
 		return tkp;
 	}
 
 	void _set_tkpos(TkPos p_pos) {
 		char_idx = p_pos.char_idx;
 		tk_line = p_pos.tk_line;
+		source_line = p_pos.src_line;
 	}
 
 	void _set_error(const String &p_str) {
@@ -815,7 +828,7 @@ private:
 			return;
 		}
 
-		error_line = tk_line;
+		error_line = source_line;
 		error_set = true;
 		error_str = p_str;
 	}
