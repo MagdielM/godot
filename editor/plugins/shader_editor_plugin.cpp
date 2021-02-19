@@ -460,20 +460,10 @@ void ShaderEditor::apply_shaders() {
 }
 
 void ShaderEditor::refresh_shader_dependencies() {
-	//ShaderDependencyGraph graph;
-	//graph.populate(shader.ptr());
-
-	List<RES> cached;
-
-	ResourceCache::get_cached_resources(&cached);
-
-	for (int i = 0; i < cached.size(); i++) {
-		Shader *shader = Object::cast_to<Shader>(*cached[i]);
-		if (shader) {
-			// Workaround to refreshing code
-			shader->set_code(shader->get_code());
-		}
-	}
+	ShaderDependencyGraph graph;
+	graph.populate(shader.ptr());
+	graph.update_shaders();
+	
 }
 
 void ShaderEditor::_text_edit_gui_input(const Ref<InputEvent> &ev) {
@@ -647,8 +637,7 @@ void ShaderEditor::ShaderDependencyGraph::update_shaders(ShaderDependencyNode no
 	for (auto E = node.dependencies.front(); E; E = E->next()) {
 		update_shaders(E->get());
 	}
-	Ref<Shader> shader = node.shader;
-	shader->set_code(shader->get_code());
+	node.shader->set_code(node.shader->get_code());
 }
 
 ShaderEditor::ShaderEditor(EditorNode *p_node) {
