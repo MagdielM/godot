@@ -6177,7 +6177,7 @@ Error ShaderLanguage::_parse_shader(const Map<StringName, FunctionInfo> &p_funct
 
 				//TODO: Yeah, we need to handle this better. Circular dependencies and all that
 				const String real_path = shader->get_path();
-				if (includes.has(real_path)) {
+				if (includes.has(path)) {
 					//Already included, skip.
 					return ERR_PARSE_ERROR;
 				}
